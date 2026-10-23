@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Star Wi-Fi (Climastar)",
+        "description": "Sign in with the email and password of the Star Wi-Fi app. The password is used once and is not stored.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Wrong email or password.",
+      "cannot_connect": "Could not reach the Star Wi-Fi cloud."
+    },
+    "abort": {
+      "already_configured": "This account is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Star Wi-Fi options",
+        "data": {
+          "allow_control": "Allow control"
+        },
+        "data_description": {
+          "allow_control": "Off: Home Assistant only reads the heaters. On: it can change setpoint, mode and on/off."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "room_temperature": {
+        "name": "Room temperature"
+      }
+    }
+  }
+}

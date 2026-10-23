@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Star Wi-Fi (Climastar)",
+        "description": "Connectez-vous avec l'e-mail et le mot de passe de l'app Star Wi-Fi. Le mot de passe sert une seule fois et n'est pas enregistré.",
+        "data": {
+          "email": "E-mail",
+          "password": "Mot de passe"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-mail ou mot de passe incorrect.",
+      "cannot_connect": "Impossible de joindre le cloud Star Wi-Fi."
+    },
+    "abort": {
+      "already_configured": "Ce compte est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Star Wi-Fi",
+        "data": {
+          "allow_control": "Autoriser le pilotage"
+        },
+        "data_description": {
+          "allow_control": "Désactivé : Home Assistant lit seulement les radiateurs. Activé : il peut changer la consigne, le mode et marche/arrêt."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "room_temperature": {
+        "name": "Température de la pièce"
+      }
+    }
+  }
+}
