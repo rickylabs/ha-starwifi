@@ -293,8 +293,19 @@ class StarWifiScheduleCard extends HTMLElement {
     if (!cell || !this._editable()) return;
     const d = Number(cell.dataset.d);
     const h = Number(cell.dataset.h);
-    if (this._draft[d][h] === this._brush) return;
-    this._draft[d][h] = this._brush;
+    // A fast drag skips cells between two moves: fill the gap from the last cell.
+    const last = this._last || { d, h };
+    this._last = { d, h };
+    let changed = false;
+    for (let dd = Math.min(last.d, d); dd <= Math.max(last.d, d); dd++) {
+      for (let hh = Math.min(last.h, h); hh <= Math.max(last.h, h); hh++) {
+        if (this._draft[dd][hh] !== this._brush) {
+          this._draft[dd][hh] = this._brush;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) return;
     this._status = null;
     this._paint();
   }
@@ -311,6 +322,7 @@ class StarWifiScheduleCard extends HTMLElement {
     const cell = e.target.closest("[data-h]");
     if (!cell) return;
     this._painting = true;
+    this._last = null;
     e.currentTarget.setPointerCapture(e.pointerId);
     this._set(cell);
   }
