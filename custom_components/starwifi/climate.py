@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import StarWifiConfigEntry
 from .api import StarWifiError
-from .const import CONF_ALLOW_CONTROL, MAX_TEMP, MIN_TEMP, TEMP_STEP
+from .const import MAX_TEMP, MIN_TEMP, TEMP_STEP
 from .coordinator import is_on, to_float
 from .entity import StarWifiEntity
 
@@ -90,13 +90,7 @@ class StarWifiClimate(StarWifiEntity, ClimateEntity):
         }
 
     async def _send(self, component: str, value: Any) -> None:
-        if not self.coordinator.config_entry.options.get(CONF_ALLOW_CONTROL, False):
-            raise HomeAssistantError(
-                "Star Wi-Fi control is off. Turn on 'Allow control' in the integration options."
-            )
-        reference = self._entry.get("device", {}).get("reference")
-        if not reference:
-            raise HomeAssistantError("This heater has no reference in the cloud data")
+        reference = self._control_reference()
         try:
             await self.coordinator.api.control(reference, component, value)
         except StarWifiError as err:

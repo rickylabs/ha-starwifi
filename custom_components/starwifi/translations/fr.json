@@ -26,15 +26,40 @@
           "allow_control": "Autoriser le pilotage"
         },
         "data_description": {
-          "allow_control": "Désactivé : Home Assistant lit seulement les radiateurs. Activé : il peut changer la consigne, le mode et marche/arrêt."
+          "allow_control": "Désactivé : Home Assistant lit seulement les radiateurs. Activé : il peut changer la consigne, le mode, la marche/arrêt et le programme de la semaine."
         }
       }
     }
   },
   "entity": {
+    "calendar": {
+      "schedule": {
+        "name": "Programme"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "Température de la pièce"
+      },
+      "planned_mode": {
+        "name": "Mode programmé",
+        "state": {
+          "comfort": "Confort",
+          "eco": "Éco",
+          "off": "Arrêt"
+        }
+      }
+    }
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Définir le programme",
+      "description": "Enregistre un nouveau programme de la semaine dans le cloud Star Wi-Fi et l'envoie au radiateur, comme Enregistrer dans l'app. Prend environ 20 secondes. Nécessite « Autoriser le pilotage ».",
+      "fields": {
+        "week": {
+          "name": "Semaine",
+          "description": "7 textes, lundi en premier, de 24 caractères chacun, un par heure : 0 arrêt, 1 confort (la consigne), 2 éco."
+        }
       }
     }
   }

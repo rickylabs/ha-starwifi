@@ -1,0 +1,11 @@
+set_schedule:
+  target:
+    entity:
+      integration: starwifi
+      domain: calendar
+  fields:
+    week:
+      required: true
+      example: '["000000011222222221111110", "000000011222222221111110", "000000011222222221111110", "000000011222222221111110", "000000011222222221111110", "000000001111111111111110", "000000001111111111111110"]'
+      selector:
+        object:

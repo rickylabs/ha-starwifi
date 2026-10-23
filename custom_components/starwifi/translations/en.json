@@ -26,15 +26,40 @@
           "allow_control": "Allow control"
         },
         "data_description": {
-          "allow_control": "Off: Home Assistant only reads the heaters. On: it can change setpoint, mode and on/off."
+          "allow_control": "Off: Home Assistant only reads the heaters. On: it can change setpoint, mode, on/off and the weekly plan."
         }
       }
     }
   },
   "entity": {
+    "calendar": {
+      "schedule": {
+        "name": "Schedule"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "Room temperature"
+      },
+      "planned_mode": {
+        "name": "Planned mode",
+        "state": {
+          "comfort": "Comfort",
+          "eco": "Eco",
+          "off": "Off"
+        }
+      }
+    }
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Set weekly plan",
+      "description": "Saves a new weekly plan in the Star Wi-Fi cloud and sends it to the heater, like the app's Save. Takes about 20 seconds. Needs 'Allow control'.",
+      "fields": {
+        "week": {
+          "name": "Week",
+          "description": "7 texts, Monday first, each 24 characters, one per hour: 0 off, 1 comfort (the setpoint), 2 eco."
+        }
       }
     }
   }

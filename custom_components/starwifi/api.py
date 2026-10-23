@@ -6,13 +6,24 @@ device reference, with no token.
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime
+import json
 from typing import Any
 
 import aiohttp
 
 from .const import API_BASE, CONTROL_URL
+from .schedule import DAYS, OFF, Week
 
 TIMEOUT = aiohttp.ClientTimeout(total=15)
+# The app waits 3 seconds between the days it sends to a heater.
+PUSH_PAUSE = 3
+
+
+def _compact(value: Any) -> str:
+    """JSON text as the app's JSON.stringify writes it, with no spaces."""
+    return json.dumps(value, separators=(",", ":"))
 
 
 class StarWifiError(Exception):
@@ -57,6 +68,41 @@ class StarWifiApi:
     async def last_readings(self, device_ids: list[str]) -> list[dict[str, Any]]:
         ids = "-".join(device_ids)
         return await self._request("GET", f"{API_BASE}/api/deviceLastMulti/{ids}") or []
+
+    async def calendar(self, reference: str) -> dict[str, str] | None:
+        """Weekly plan as {"L-08:00": "1", ...}, or None when the app never saved one."""
+        rows = await self._request("GET", f"{API_BASE}/api/device/{reference}/calendar")
+        row = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
+        value = row.get("dev_option_value")
+        if not value:
+            return None
+        try:
+            slots = json.loads(value)["heat"]
+            return {str(s["id"]): str(s["state"]) for s in slots}
+        except (ValueError, KeyError, TypeError) as err:
+            raise StarWifiError(f"unreadable plan for {reference}: {err}") from err
+
+    async def save_calendar(self, reference: str, week: Week) -> None:
+        """Store the plan in the cloud, as the app does: only the slots that are not off."""
+        heat = [
+            {"id": f"{day}-{hour:02d}:00", "state": state}
+            for day, states in zip(DAYS, week)
+            for hour, state in enumerate(states)
+            if state != OFF
+        ]
+        await self._request(
+            "POST",
+            f"{API_BASE}/api/device/calendar/save",
+            {"_method": "PATCH", "device": reference, "calendar": _compact({"heat": heat})},
+        )
+
+    async def push_calendar(self, reference: str, week: Week, now: datetime) -> None:
+        """Send the plan to the heater as the app does: its clock first, then one day every 3 seconds."""
+        # The app sends JavaScript's getDay(): 0 is Sunday.
+        await self.control(reference, "datetime", f"{(now.weekday() + 1) % 7},{now:%Y-%m-%dT%H:%M:%S}")
+        for day, states in zip(DAYS, week):
+            await asyncio.sleep(PUSH_PAUSE)
+            await self.control(reference, "calendar", _compact({day: states, "action": 1}))
 
     async def control(self, reference: str, component: str, value: Any) -> None:
         await self._request(
