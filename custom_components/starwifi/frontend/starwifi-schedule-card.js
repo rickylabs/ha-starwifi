@@ -366,9 +366,17 @@ class StarWifiScheduleCard extends HTMLElement {
   }
 }
 
-if (!customElements.get("starwifi-schedule-card")) {
-  customElements.define("starwifi-schedule-card", StarWifiScheduleCard);
-}
+// Home Assistant replaces window.customElements while it starts. A card
+// defined before that is lost to dashboards (home-assistant/frontend#53890),
+// so define it only once the app's own root element exists.
+const defineCard = () => {
+  if (!customElements.get("starwifi-schedule-card")) {
+    customElements.define("starwifi-schedule-card", StarWifiScheduleCard);
+  }
+};
+if (customElements.get("home-assistant")) defineCard();
+else customElements.whenDefined("home-assistant").then(defineCard);
+
 window.customCards = window.customCards || [];
 if (!window.customCards.some((c) => c.type === "starwifi-schedule-card")) {
   window.customCards.push({

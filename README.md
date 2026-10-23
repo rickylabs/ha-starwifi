@@ -39,6 +39,8 @@ Saving needs **Allow control** (see below). The same thing is available as the s
 
 After an update and restart, a page that was already open still has the old card. Reload it once (in the mobile app: close and reopen it).
 
+Before 0.4.1 the card could show "Configuration error" after a cold start of the mobile app (home-assistant/frontend#53890). Update and restart Home Assistant to fix it.
+
 ## Energy per heater
 
 The app's history shows how much energy each heater used, hour by hour. The integration copies it into Home Assistant's long-term statistics, as `starwifi:energy_<id>` with the name "<heater> energy", in kWh.
