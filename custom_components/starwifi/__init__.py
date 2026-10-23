@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
@@ -12,7 +13,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
 
 from .api import StarWifiApi
 from .const import DOMAIN
@@ -27,14 +27,19 @@ CARD_FILE = "starwifi-schedule-card.js"
 type StarWifiConfigEntry = ConfigEntry[StarWifiCoordinator]
 
 
+def card_hash(path: Path) -> str:
+    """First 8 hex digits of the card file's SHA-256."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Serve the schedule card and load it on every dashboard."""
-    integration = await async_get_integration(hass, DOMAIN)
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(Path(__file__).parent / "frontend"), True)]
-    )
-    # The version in the URL makes browsers fetch the new card after an update.
-    add_extra_js_url(hass, f"{CARD_URL}/{CARD_FILE}?v={integration.version}")
+    frontend = Path(__file__).parent / "frontend"
+    await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(frontend), True)])
+    # Browsers keep this file for a month, so the URL carries the file's own
+    # hash: any change to the card, even within one version, is fetched anew.
+    version = await hass.async_add_executor_job(card_hash, frontend / CARD_FILE)
+    add_extra_js_url(hass, f"{CARD_URL}/{CARD_FILE}?v={version}")
     return True
 
 

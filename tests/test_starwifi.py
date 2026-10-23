@@ -2,7 +2,9 @@
 
 import asyncio
 from datetime import datetime, timedelta
+import hashlib
 import json
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -14,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError  # noqa: E402
 from homeassistant.util import dt as dt_util  # noqa: E402
 import voluptuous as vol  # noqa: E402  (after homeassistant, which may replace it)
 
+import custom_components.starwifi as SW  # noqa: E402
 from custom_components.starwifi import api as A  # noqa: E402
 from custom_components.starwifi import calendar as CA  # noqa: E402
 from custom_components.starwifi import climate as CL  # noqa: E402
@@ -227,6 +230,26 @@ async def main():
     except HomeAssistantError:
         check("save error reported", True)
     check("plan unchanged after error", schedule.extra_state_attributes["week"] == new_week)
+
+    # The card URL carries the file's hash, so a changed card is never taken from a browser's cache.
+    urls, jobs = [], []
+
+    async def run_job(fn, *args):
+        jobs.append(fn)
+        return fn(*args)
+
+    async def register(paths):
+        return None
+
+    real_add = SW.add_extra_js_url
+    SW.add_extra_js_url = lambda _hass, url: urls.append(url)
+    try:
+        await SW.async_setup(SimpleNamespace(http=SimpleNamespace(async_register_static_paths=register), async_add_executor_job=run_job), {})
+    finally:
+        SW.add_extra_js_url = real_add
+    card = Path(SW.__file__).parent / "frontend" / SW.CARD_FILE
+    check("card URL carries the file hash", urls == [f"{SW.CARD_URL}/{SW.CARD_FILE}?v={hashlib.sha256(card.read_bytes()).hexdigest()[:8]}"])
+    check("card hashed off the event loop", jobs == [SW.card_hash])
 
 
 asyncio.run(main())

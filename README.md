@@ -36,6 +36,8 @@ Without `entity`, the card shows a heater picker. Paint hours with the Comfort /
 
 Saving needs **Allow control** (see below). The same thing is available as the service `starwifi.set_schedule`, with `week` as 7 strings of 24 digits, Monday first: `0` off, `1` comfort, `2` eco.
 
+After an update and restart, a page that was already open still has the old card. Reload it once (in the mobile app: close and reopen it).
+
 ## Install
 
 **HACS:** HACS → three dots → Custom repositories → add `https://github.com/rickylabs/ha-starwifi`, type Integration. Download "Star Wi-Fi (Climastar)", then restart Home Assistant.
@@ -59,7 +61,7 @@ With it off, any change from Home Assistant is refused and nothing is sent to th
 - Cloud only. Needs internet.
 - Setpoint: 5 to 30 °C, in 0.5 °C steps.
 - Plans are hourly, like the app. Groups and history from the app are not in Home Assistant yet.
-- Control sends the same commands as the app. Setpoint changes are tested on a real heater. On/off, preset and plan saving are not tested on a real heater yet: please open an issue if one does not work.
+- Control sends the same commands as the app. Setpoint changes and plan saving are tested on a real heater. On/off and preset are not tested on a real heater yet: please open an issue if one does not work.
 
 ## Tests
 
