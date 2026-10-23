@@ -39,7 +39,7 @@ With it off, any change from Home Assistant is refused and nothing is sent to th
 - Cloud only. Needs internet.
 - Setpoint: 5 to 30 °C, in 0.5 °C steps.
 - Weekly schedules, groups and history from the app are not in Home Assistant yet.
-- Control sends the same commands as the app. So far it has been tested against recorded answers only. Please open an issue if a command does not work on your heater.
+- Control sends the same commands as the app. Setpoint changes are tested on a real heater. On/off and preset are not tested on a real heater yet: please open an issue if one does not work.
 
 ## Tests
 
