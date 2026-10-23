@@ -12,11 +12,13 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from .api import StarWifiApi
 from .const import DOMAIN
 from .coordinator import StarWifiCoordinator
+from .energy import ENERGY_INTERVAL, EnergyImporter
 
 PLATFORMS = [Platform.CALENDAR, Platform.CLIMATE, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -49,6 +51,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: StarWifiConfigEntry) -> 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+    energy = EnergyImporter(hass, coordinator)
+    entry.async_on_unload(async_track_time_interval(hass, energy.start, ENERGY_INTERVAL))
+    energy.start()
     return True
 
 

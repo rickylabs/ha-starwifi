@@ -7,7 +7,7 @@ device reference, with no token.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import date, datetime
 import json
 from typing import Any
 
@@ -103,6 +103,29 @@ class StarWifiApi:
         for day, states in zip(DAYS, week):
             await asyncio.sleep(PUSH_PAUSE)
             await self.control(reference, "calendar", _compact({day: states, "action": 1}))
+
+    async def day_consumption(self, reference: str, day: date) -> dict[int, float]:
+        """Energy of one local day from the app's history, as {hour: kWh}.
+
+        One row per hour, stamped with the hour's local start. An hour with no use
+        has no row, and an hour shows up only once it is over.
+        """
+        body = await self._request(
+            "POST",
+            f"{API_BASE}/api/device/history/temperatura",
+            {"reference": reference, "year": f"{day:%Y}", "month": f"{day:%m}", "day": f"{day:%d}"},
+        )
+        rows = body.get("consumptions") if isinstance(body, dict) else None
+        hours: dict[int, float] = {}
+        for row in rows or []:
+            try:
+                stamp = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S")
+                kwh = float(row["power_consumption"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if stamp.date() == day:
+                hours[stamp.hour] = hours.get(stamp.hour, 0.0) + kwh
+        return hours
 
     async def control(self, reference: str, component: str, value: Any) -> None:
         await self._request(

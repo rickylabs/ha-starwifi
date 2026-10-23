@@ -15,6 +15,7 @@ For each heater in your account:
 - A **schedule** calendar: the weekly plan saved in the app, one event per comfort or eco period.
 - A **planned mode** sensor: what the plan says right now (`comfort`, `eco` or `off`).
 - Extra attributes: `window`, `away` and `reference`.
+- Its **energy**, hour by hour, for the Energy dashboard (see below).
 
 Values refresh every 60 seconds; plans every 15 minutes. A heater that the app shows as offline shows as unavailable.
 
@@ -38,6 +39,17 @@ Saving needs **Allow control** (see below). The same thing is available as the s
 
 After an update and restart, a page that was already open still has the old card. Reload it once (in the mobile app: close and reopen it).
 
+## Energy per heater
+
+The app's history shows how much energy each heater used, hour by hour. The integration copies it into Home Assistant's long-term statistics, as `starwifi:energy_<id>` with the name "<heater> energy", in kWh.
+
+- The first time, it reads the last 31 days. After that, it checks every 30 minutes.
+- An hour shows up once it is over, often a little later. The integration reads the last hours again, so late values are filled in.
+
+To see them: Settings → Dashboards → Energy → **Individual devices** → Add device, then pick the heater's energy statistic. If all your heaters are behind one meter that Home Assistant already knows, set that meter as the heater's upstream device, so the meter's own figure is not counted twice.
+
+These are the app's own figures. They may not add up to what a real meter measures: trust the meter for the bill.
+
 ## Install
 
 **HACS:** HACS → three dots → Custom repositories → add `https://github.com/rickylabs/ha-starwifi`, type Integration. Download "Star Wi-Fi (Climastar)", then restart Home Assistant.
@@ -60,7 +72,7 @@ With it off, any change from Home Assistant is refused and nothing is sent to th
 
 - Cloud only. Needs internet.
 - Setpoint: 5 to 30 °C, in 0.5 °C steps.
-- Plans are hourly, like the app. Groups and history from the app are not in Home Assistant yet.
+- Plans are hourly, like the app. The app's groups and its temperature history are not in Home Assistant yet.
 - Control sends the same commands as the app. Setpoint changes and plan saving are tested on a real heater. On/off and preset are not tested on a real heater yet: please open an issue if one does not work.
 
 ## Tests

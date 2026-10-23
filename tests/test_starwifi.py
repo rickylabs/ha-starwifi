@@ -1,7 +1,7 @@
 """Offline checks for custom_components/starwifi. Run from the repo root inside a Home Assistant environment: python3 tests/test_starwifi.py ."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -22,6 +22,7 @@ from custom_components.starwifi import calendar as CA  # noqa: E402
 from custom_components.starwifi import climate as CL  # noqa: E402
 from custom_components.starwifi import config_flow  # noqa: E402,F401
 from custom_components.starwifi import coordinator as C  # noqa: E402
+from custom_components.starwifi import energy as E  # noqa: E402
 from custom_components.starwifi import schedule as P  # noqa: E402
 from custom_components.starwifi import sensor as S  # noqa: E402
 
@@ -250,6 +251,110 @@ async def main():
     card = Path(SW.__file__).parent / "frontend" / SW.CARD_FILE
     check("card URL carries the file hash", urls == [f"{SW.CARD_URL}/{SW.CARD_FILE}?v={hashlib.sha256(card.read_bytes()).hexdigest()[:8]}"])
     check("card hashed off the event loop", jobs == [SW.card_hash])
+
+    await energy_checks(api)
+
+
+HISTORY_URL = f"{B}/api/device/history/temperatura"
+# The cloud answers every day with these rows here; only the asked day's rows count.
+ROUTES[("POST", HISTORY_URL)] = (200, {"temperature": [], "consumptions": [
+    {"created_at": "2026-10-22 06:00:00", "power_consumption": "0.08"},
+    {"created_at": "2026-10-22 07:00:00", "power_consumption": "0.30"},
+    {"created_at": "2026-10-21 23:00:00", "power_consumption": "1.5"},
+    {"created_at": "2026-10-22 08:00:00", "power_consumption": "-"},
+]})
+UTC = timezone.utc
+
+
+async def energy_checks(api):
+    check("history read per local hour", await api.day_consumption("R11", date(2026, 10, 22)) == {6: 0.08, 7: 0.3})
+
+    def local(*args):
+        return datetime(*args, tzinfo=ZURICH).astimezone(UTC)
+
+    day = local(2026, 10, 22)
+    rows = E.hourly_rows(day, day + timedelta(days=1), ZURICH, {date(2026, 10, 22): {6: 0.08, 7: 0.3}}, 5.0)
+    check("a day is 24 rows", len(rows) == 24 and rows[0][0] == day)
+    check("hour 06 local holds its energy", rows[6][1:] == (0.08, 5.08) and rows[5][1:] == (0.0, 5.0))
+    check("running total", rows[-1][2] == 5.38)
+    autumn = local(2026, 10, 25)
+    rows = E.hourly_rows(autumn, local(2026, 10, 26), ZURICH, {date(2026, 10, 25): {2: 0.5, 3: 0.2}}, 0.0)
+    check("clocks back: 25 hours", len(rows) == 25)
+    check("repeated hour counted once", [r[1] for r in rows[2:5]] == [0.5, 0.0, 0.2] and rows[-1][2] == 0.7)
+    spring = local(2026, 3, 29)
+    check("clocks forward: 23 hours", len(E.hourly_rows(spring, local(2026, 3, 30), ZURICH, {}, 0.0)) == 23)
+
+    # The importer, with the recorder replaced by a table in memory.
+    stored, asked, written = {}, [], []
+
+    async def run_job(fn, *args):
+        return fn(*args)
+
+    def last_stats(_hass, _n, stat, _convert, _types):
+        return {stat: [{"start": stored[stat][-1][0].timestamp(), "sum": stored[stat][-1][2]}]} if stored.get(stat) else {}
+
+    def during(_hass, start, end, stats, _period, _units, _types):
+        asked.append((start, end))
+        (stat,) = stats
+        found = [{"sum": s} for t, _k, s in stored.get(stat, []) if start <= t < end]
+        return {stat: found} if found else {}
+
+    def add(_hass, metadata, stats):
+        written.append(metadata)
+        rows = {r[0]: r for r in stored.get(metadata["statistic_id"], [])}
+        rows.update({s["start"]: (s["start"], s["state"], s["sum"]) for s in stats})
+        stored[metadata["statistic_id"]] = sorted(rows.values())
+
+    real = E.get_instance, E.get_last_statistics, E.statistics_during_period, E.async_add_external_statistics, dt_util.utcnow
+    E.get_instance = lambda _hass: SimpleNamespace(async_add_executor_job=run_job)
+    E.get_last_statistics, E.statistics_during_period, E.async_add_external_statistics = last_stats, during, add
+    tasks = []
+    heaters = SimpleNamespace(api=api, data={"11": {"device": {"reference": "R11"}, "label": "Living room"}, "13": {"device": {}, "label": "No reference"}},
+                              config_entry=SimpleNamespace(async_create_background_task=lambda _h, coro, _n: tasks.append(asyncio.ensure_future(coro)) or tasks[-1]))
+    importer = E.EnergyImporter(None, heaters)
+    history_calls = lambda: sum(1 for c in api._session.calls if c[1] == HISTORY_URL)  # noqa: E731
+    try:
+        # First run: 31 days back, from local midnight, up to the hour that is running.
+        dt_util.utcnow = lambda: local(2026, 10, 23, 10, 20)
+        before = history_calls()
+        importer.start()
+        importer.start()
+        await tasks[0]
+        rows = stored.get("starwifi:energy_11", [])
+        check("one import at a time", len(tasks) == 1)
+        check("first run reads 32 days", history_calls() - before == 32)
+        check("first run starts at local midnight 31 days back", rows and rows[0][0] == local(2026, 9, 22))
+        check("first run ends before the running hour", rows and rows[-1][0] == local(2026, 10, 23, 9))
+        check("every hour written", len(rows) == 31 * 24 + 10)
+        check("energy in its hour", (local(2026, 10, 22, 6), 0.08, 1.58) in rows and (local(2026, 10, 21, 23), 1.5, 1.5) in rows)
+        check("total so far", rows and rows[-1][2] == 1.88)
+        check("statistic metadata", written and {k: written[0][k] for k in ("source", "statistic_id", "name", "unit_of_measurement", "has_sum")} == {
+            "source": "starwifi", "statistic_id": "starwifi:energy_11", "name": "Living room energy", "unit_of_measurement": "kWh", "has_sum": True})
+        check("heater with no reference skipped", list(stored) == ["starwifi:energy_11"])
+
+        # Later run: today only, on top of the total at midnight.
+        dt_util.utcnow = lambda: local(2026, 10, 23, 11, 5)
+        before, asked[:] = history_calls(), []
+        await importer.run()
+        check("later run reads today only", history_calls() - before == 1)
+        check("total before midnight looked up", asked == [(local(2026, 10, 22, 23), local(2026, 10, 23))])
+        check("later run adds the new hour", len(stored["starwifi:energy_11"]) == 31 * 24 + 11 and stored["starwifi:energy_11"][-1][2] == 1.88)
+
+        # Just after midnight, yesterday's last hours are read again: their rows come late.
+        stored["starwifi:energy_11"] = [r for r in stored["starwifi:energy_11"] if r[0] < local(2026, 10, 23, 2)]
+        dt_util.utcnow = lambda: local(2026, 10, 23, 2, 30)
+        before = history_calls()
+        await importer.run()
+        check("after midnight yesterday is read again", history_calls() - before == 2)
+
+        # A cloud error writes nothing.
+        ROUTES[("POST", HISTORY_URL)] = (500, None)
+        count = len(written)
+        dt_util.utcnow = lambda: local(2026, 10, 23, 12, 5)
+        await importer.run()
+        check("cloud error writes nothing", len(written) == count)
+    finally:
+        E.get_instance, E.get_last_statistics, E.statistics_during_period, E.async_add_external_statistics, dt_util.utcnow = real
 
 
 asyncio.run(main())
